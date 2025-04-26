@@ -9,10 +9,11 @@ def init_db():
     c = conn.cursor()
     c.execute('''CREATE TABLE IF NOT EXISTS users (
             user_id TEXT PRIMARY KEY,
-            coins INTEGER DEFAULT 1000,
+            coins INTEGER DEFAULT 1000
     )''')
     c.execute('''CREATE TABLE IF NOT EXISTS bets (
-            id TEXT PRIMARY KEY AUTOINCREMENT,
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id TEXT,
             coins_set INTEGER,
             condition BOOLEAN,
             target TEXT,
@@ -29,8 +30,9 @@ def add_user_if_not_exists(user_id):
     c = conn.cursor()
     c.execute('INSERT OR IGNORE INTO users (user_id) VALUES (?)', (str(user_id),))
     conn.commit()
+    if (c.rowcount > 0):
+        print(f"Added user {user_id}")    
     conn.close()
-    print(f"Added user {user_id}")
 
 def add_coins(user_id, amount):
     conn = sqlite3.connect(DB_FILE)
@@ -40,25 +42,31 @@ def add_coins(user_id, amount):
     conn.close()
     print(f'Added {amount} coins to user {user_id}. Current balance of {user_id} is {get_balance(user_id)}')
 
-def get_balance(user_id):
-    conn = sqlite3.connect(DB_FILE)
-    c = conn.cursor()
-    c.execute(f'SELECT coins FROM users WHERE user_id = ?', (str(user_id),))
-    result = c.fetchone()
-    conn.close()
+def get_balance(user_id, c=None):
+    if c is None:
+        conn = sqlite3.connect(DB_FILE)
+        c = conn.cursor()
+        c.execute(f'SELECT coins FROM users WHERE user_id = ?', (str(user_id),))
+        result = c.fetchone()
+        conn.close()
+    else:
+        c.execute(f'SELECT coins FROM users WHERE user_id = ?', (str(user_id),))
+        result = c.fetchone()
     print(f'Retrieved amount of coins of {user_id}.')
     return result[0] if result else 0
 
 def insert_bet(amount, condition, user_betting, user_betting_on):
     conn = sqlite3.connect(DB_FILE)
     c = conn.cursor()
+    success = False
     if (update_balance(user_betting, amount, False)):
         c.execute('INSERT INTO bets (user_id, coins_set, condition, target, timestamp, resolved, outcome) VALUES (?, ?, ?, ?, ?, ?, ?)', 
-                                    (str(user_betting), amount, condition, user_betting_on, datetime.now().isoformat(), 0, 0))
+                                    (str(user_betting), amount, condition, user_betting_on, datetime.datetime.now().isoformat(), 0, 0))
         print(f"User {user_betting} placed bet of {amount} on {condition} targeting {user_betting_on}.")
+        success = True
     conn.commit()
     conn.close()
-    
+    return success
 
 def update_balance(user_id, amount_delta, increase):
     with sqlite3.connect(DB_FILE) as conn:
@@ -66,7 +74,7 @@ def update_balance(user_id, amount_delta, increase):
         if increase:
             c.execute('UPDATE users SET coins = coins + ? WHERE user_id = ?', (amount_delta, str(user_id)))
         else:
-            if(get_balance(user_id) >= amount_delta):
+            if(get_balance(user_id, c) >= amount_delta):
                 c.execute('UPDATE users SET coins = coins - ? WHERE user_id = ?', (amount_delta, str(user_id)))
             else:
                 print(f"User {user_id} has insufficient amount of coins for the bet.")

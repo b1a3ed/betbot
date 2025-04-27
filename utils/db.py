@@ -15,7 +15,7 @@ def init_db():
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             user_id TEXT,
             coins_set INTEGER,
-            condition BOOLEAN,
+            condition TEXT,
             target TEXT,
             timestamp TEXT,
             resolved BOOLEAN DEFAULT 0,
@@ -94,3 +94,30 @@ def get_my_bets(user_id, c=None):
             result = c.fetchall()
     print(f'Retrieved all unresolved bets by user {user_id}.')
     return result if result else False
+
+def bet_resolve(bet_id, outcome, c=None):
+    if c is None:
+        with sqlite3.connect(DB_FILE) as conn:
+            c = conn.cursor()
+            c.execute("SELECT user_id, coins_set FROM bets WHERE id = ?", (bet_id,))
+            result = c.fetchall()
+            if result[]
+            update_balance(result[0], result[1], 1)
+            c.execute('UPDATE bets SET resolved = 1, outcome = ? WHERE id = ?', (outcome, bet_id))
+            conn.commit()
+            success = (c.rowcount > 0)
+    else:
+        update_balance(result[0], result[1], 1)
+        c.execute('UPDATE bets SET resolved = 1, outcome = ?', (bet_id, outcome))
+        conn.commit()
+        success = (c.rowcount > 0)
+    
+    if success:
+        print(f"Bet {bet_id} was resolved successfully")
+    else:
+        print(f"Bet {bet_id} could not be resolved.")
+    return success
+
+def bet_payout(user_id, amount):
+
+        

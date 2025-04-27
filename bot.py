@@ -34,6 +34,27 @@ async def place_bet(ctx, condition: str, amount: int, target: discord.Member):
             await ctx.send(f"{ctx.author.mention}, you successfully placed your bet on {condition} from {target}")
         else: await ctx.send(f"{ctx.author.mention}, you have insufficient balance to place this bet")
 
+@bot.command()
+async def mybets(ctx):
+    bets = db.get_my_bets(ctx.author.id, None)
+    if not bets:
+         await ctx.send(f"{ctx.author.mention}, you have no active bets.")
+    else:
+        table_content = "Bet ID     Coins     Condition       Target        Time\n"
+        table_content +="-------------------------------------------------------\n"
+        for bet in bets:
+            id, coins, condition, target, time = bet
+            member = ctx.guild.get_member(int(target))
+            target_name = member.display_name if member else str(target)
+            table_content += f"{str(id).ljust(10)} {str(coins).ljust(10)} {condition.ljust(12)} {target_name.ljust(18)} {time}\n"
+
+        await ctx.send(f"{ctx.author.mention}, here are your active bets:\n\n```{table_content}```")
+
+
+             
+        
+    
+         
 
 bot.run(os.getenv("DISCORD_TOKEN"))
  

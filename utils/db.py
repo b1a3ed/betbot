@@ -82,3 +82,15 @@ def update_balance(user_id, amount_delta, increase):
         conn.commit()
         print(f"User {user_id} has successfully placed a bet of {amount_delta} coins.")
         return True
+
+def get_my_bets(user_id, c=None):
+    if c is None:
+        with sqlite3.connect(DB_FILE) as conn:
+            c = conn.cursor()
+            c.execute('SELECT id, coins_set, condition, target, timestamp FROM bets WHERE user_id = ? AND resolved = 0', (str(user_id), ) )
+            result = c.fetchall()
+    else:
+            c.execute('SELECT id, coins_set, condition, target, timestamp FROM bets WHERE user_id = ? AND resolved = 0', (str(user_id), ) )
+            result = c.fetchall()
+    print(f'Retrieved all unresolved bets by user {user_id}.')
+    return result if result else False

@@ -2,6 +2,8 @@ import sqlite3
 import datetime
 from pathlib import Path
 
+coefficient = 2
+
 DB_FILE = Path("data/users.db")
 
 def init_db():
@@ -56,32 +58,46 @@ def get_balance(user_id, c=None):
     return result[0] if result else 0
 
 def insert_bet(amount, condition, user_betting, user_betting_on):
-    conn = sqlite3.connect(DB_FILE)
-    c = conn.cursor()
-    success = False
-    if (update_balance(user_betting, amount, False)):
-        c.execute('INSERT INTO bets (user_id, coins_set, condition, target, timestamp, resolved, outcome) VALUES (?, ?, ?, ?, ?, ?, ?)', 
-                                    (str(user_betting), amount, condition, user_betting_on, datetime.datetime.now().isoformat(), 0, 0))
-        print(f"User {user_betting} placed bet of {amount} on {condition} targeting {user_betting_on}.")
-        success = True
-    conn.commit()
-    conn.close()
+    if (user_betting == user_betting_on):
+        return False
+    else:
+        conn = sqlite3.connect(DB_FILE)
+        c = conn.cursor()
+        success = False
+        if (update_balance(user_betting, amount, False, c)):
+            c.execute('INSERT INTO bets (user_id, coins_set, condition, target, timestamp, resolved, outcome) VALUES (?, ?, ?, ?, ?, ?, ?)', 
+                                        (str(user_betting), amount, condition, user_betting_on, datetime.datetime.now().isoformat(), 0, 0))
+            print(f"User {user_betting} placed bet of {amount} on {condition} targeting {user_betting_on}.")
+            success = True
+        conn.commit()
+        conn.close()
     return success
 
-def update_balance(user_id, amount_delta, increase):
-    with sqlite3.connect(DB_FILE) as conn:
-        c = conn.cursor()
+def update_balance(user_id, amount_delta, increase, c=None):
+    if c is None:
+        with sqlite3.connect(DB_FILE) as conn:
+            c = conn.cursor()
+            if increase:
+                c.execute('UPDATE users SET coins = coins + ? WHERE user_id = ?', (amount_delta, str(user_id)))
+                print(f'Balance of {user_id} was updated with +{amount_delta} coins.')
+            else:
+                if(get_balance(user_id, c) >= amount_delta):
+                    c.execute('UPDATE users SET coins = coins - ? WHERE user_id = ?', (amount_delta, str(user_id)))
+                else:
+                    print(f"User {user_id} has insufficient amount of coins for the bet.")
+                    return False
+            conn.commit()
+    else:
         if increase:
             c.execute('UPDATE users SET coins = coins + ? WHERE user_id = ?', (amount_delta, str(user_id)))
+            print(f'Balance of {user_id} was updated with +{amount_delta} coins.')
         else:
             if(get_balance(user_id, c) >= amount_delta):
                 c.execute('UPDATE users SET coins = coins - ? WHERE user_id = ?', (amount_delta, str(user_id)))
             else:
                 print(f"User {user_id} has insufficient amount of coins for the bet.")
                 return False
-        conn.commit()
-        print(f"User {user_id} has successfully placed a bet of {amount_delta} coins.")
-        return True
+    return True
 
 def get_my_bets(user_id, c=None):
     if c is None:
@@ -95,29 +111,83 @@ def get_my_bets(user_id, c=None):
     print(f'Retrieved all unresolved bets by user {user_id}.')
     return result if result else False
 
+def get_all_bets(c=None):
+    if c is None:
+        with sqlite3.connect(DB_FILE) as conn:
+            c = conn.cursor()
+            c.execute('SELECT id, coins_set, condition, target, timestamp FROM bets WHERE resolved = 0')
+            results = c.fetchall()
+            success = (len(results) > 0)
+    else:
+            c.execute('SELECT id, coins_set, condition, target, timestamp FROM bets WHERE resolved = 0')
+            results = c.fetchall()
+            success = (len(results) > 0)
+    if success:
+        print('Retrieved all unresolved bets.')
+        return results
+    else:
+        print('Retrieval of all bets failed.')
+        return False
+
 def bet_resolve(bet_id, outcome, c=None):
+    outcome = int(outcome)
     if c is None:
         with sqlite3.connect(DB_FILE) as conn:
             c = conn.cursor()
             c.execute("SELECT user_id, coins_set FROM bets WHERE id = ?", (bet_id,))
-            result = c.fetchall()
-            if result[]
-            update_balance(result[0], result[1], 1)
+            result = c.fetchone()
+            if not result:
+                print(f"No bet found with ID {bet_id}")
+                return False
+            else:
+                UNPACKED_userid, UNPACKED_coins = result
+                if (outcome == 1):
+                    update_balance(UNPACKED_userid, UNPACKED_coins * coefficient, 1, c)
             c.execute('UPDATE bets SET resolved = 1, outcome = ? WHERE id = ?', (outcome, bet_id))
             conn.commit()
             success = (c.rowcount > 0)
     else:
-        update_balance(result[0], result[1], 1)
-        c.execute('UPDATE bets SET resolved = 1, outcome = ?', (bet_id, outcome))
-        conn.commit()
-        success = (c.rowcount > 0)
-    
+            c.execute("SELECT user_id, coins_set FROM bets WHERE id = ?", (bet_id,))
+            result = c.fetchone()
+            if not result:
+                print(f"No bet found with ID {bet_id}")
+                return False
+            else:
+                UNPACKED_userid, UNPACKED_coins = result
+                if outcome:
+                    update_balance(UNPACKED_userid, UNPACKED_coins * coefficient, 1, c)
+            c.execute('UPDATE bets SET resolved = 1, outcome = ? WHERE id = ?', (outcome, bet_id))
+            success = (c.rowcount > 0)
     if success:
         print(f"Bet {bet_id} was resolved successfully")
     else:
         print(f"Bet {bet_id} could not be resolved.")
     return success
 
-def bet_payout(user_id, amount):
-
-        
+def resolve_target(target, outcome, c=None):
+    outcome = int(outcome)
+    resolved_bets = 0
+    if c is None:
+        with sqlite3.connect(DB_FILE) as conn:
+            c = conn.cursor()
+            c.execute("SELECT id FROM bets WHERE target = ? AND resolved = 0", (target,))
+            results = c.fetchall()
+            bet_ids = [result[0] for result in results]
+            for bet_id in bet_ids:
+                bet_resolve(bet_id, outcome, c)
+                resolved_bets+=1
+            conn.commit()
+    else:
+        c.execute("SELECT id FROM bets WHERE target = ? AND resolved = 0", (target,))
+        results = c.fetchall()
+        bet_ids = [result[0] for result in results]
+        for bet_id in bet_ids:
+            bet_resolve(bet_id, outcome, c)
+            resolved_bets+=1
+        conn.commit()
+    if resolved_bets:
+        print(f"All bets for {target} were successfully resolved.")
+        return True
+    else:
+        print(f"There was an error resolving all bets for {target}.")
+        return False

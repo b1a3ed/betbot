@@ -1,6 +1,7 @@
 # BetBot
 
-A Discord bot for managing virtual betting games with persistent user balances.
+Discord bot for accepting, placing, and resolving bets with virtual currency.
+
 
 ## Features
 
